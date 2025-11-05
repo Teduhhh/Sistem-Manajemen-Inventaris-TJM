@@ -163,7 +163,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reduce_stock'])) {
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="dashboard.php">
-                <i class="bi bi-box-seam"></i> Inventory System - Gudang
+                <i class="bi bi-box-seam"></i> Sistem Manajemen Inventaris 
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -172,17 +172,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reduce_stock'])) {
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                         <a class="nav-link active" href="kelola_stok.php">
-                            <i class="bi bi-boxes"></i> Kelola Stok
+                            <i class="bi bi-boxes"></i> Kelola Stok Gudang
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="riwayat_masuk.php">
-                            <i class="bi bi-box-arrow-in-down"></i> Riwayat Masuk
+                            <i class="bi bi-box-arrow-in-down"></i> Riwayat Produk Masuk
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="riwayat_keluar.php">
-                            <i class="bi bi-box-arrow-up"></i> Riwayat Keluar
+                            <i class="bi bi-box-arrow-up"></i> Riwayat Produk Keluar
                         </a>
                     </li>
                     <li class="nav-item">
@@ -198,9 +198,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reduce_stock'])) {
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2><i class="bi bi-boxes"></i> Kelola Stok Gudang</h2>
-            <a href="manage_stock.php" class="btn btn-primary">
-                <i class="bi bi-gear-fill"></i> Kelola Stok Lengkap
-            </a>
         </div>
 
         <!-- Notifikasi -->
@@ -300,7 +297,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reduce_stock'])) {
                                 <th>Kategori</th>
                                 <th>Harga</th>
                                 <th>Stok</th>
-                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -322,11 +318,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reduce_stock'])) {
                                         <span class="badge rounded-pill bg-<?php echo ($row['stok'] < 5) ? 'danger' : (($row['stok'] < 10) ? 'warning text-dark' : 'success'); ?> badge-stok">
                                             <?php echo $row['stok']; ?>
                                         </span>
-                                    </td>
-                                    <td>
-                                        <a href="edit_stock.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-primary">
-                                            <i class="bi bi-pencil-fill"></i> Edit
-                                        </a>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>

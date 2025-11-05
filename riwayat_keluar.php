@@ -93,7 +93,7 @@ if (isset($_GET['export'])) {
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="dashboard.php">
-                <i class="bi bi-box-seam"></i> Inventory System - Gudang
+                <i class="bi bi-box-seam"></i> Sistem Manajemen Inventaris
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -107,12 +107,12 @@ if (isset($_GET['export'])) {
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="riwayat_masuk.php">
-                            <i class="bi bi-box-arrow-in-down"></i> Riwayat Masuk
+                            <i class="bi bi-box-arrow-in-down"></i> Riwayat Produk Masuk
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link active" href="riwayat_keluar.php">
-                            <i class="bi bi-box-arrow-up"></i> Riwayat Keluar
+                            <i class="bi bi-box-arrow-up"></i> Riwayat Produk Keluar
                         </a>
                     </li>
                     <li class="nav-item">
@@ -127,7 +127,7 @@ if (isset($_GET['export'])) {
 
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2><i class="bi bi-box-arrow-up"></i> Riwayat Barang Keluar</h2>
+            <h2><i class="bi bi-box-arrow-up"></i> Riwayat Produk Keluar</h2>
             <span class="badge bg-primary">
                 Total Data: <?php echo $result->num_rows; ?>
             </span>
@@ -168,7 +168,7 @@ if (isset($_GET['export'])) {
         <!-- Tabel Riwayat -->
         <div class="card history-card">
             <div class="card-header bg-danger text-white">
-                <i class="bi bi-list-check"></i> Daftar Riwayat Barang Keluar
+                <i class="bi bi-list-check"></i> Daftar Riwayat Produk Keluar
             </div>
             <div class="card-body">
                 <div class="table-responsive">

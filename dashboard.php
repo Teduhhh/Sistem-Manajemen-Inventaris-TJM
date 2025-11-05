@@ -1,13 +1,11 @@
 <?php
 session_start();
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Kasir') {
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Gudang') {
     header("Location: ../index.html");
     exit();
 }
 
+// Koneksi database
 $host = "localhost";
 $user = "root";
 $password = "";
@@ -18,60 +16,32 @@ if ($conn->connect_error) {
     die("Koneksi database gagal: " . $conn->connect_error);
 }
 
-// Inisialisasi variabel
-$username = $_SESSION['username'] ?? 'Kasir';
-$jumlah_transaksi = 0;
-$total_pendapatan = 0;
-$produk_terlaris = 'Belum ada transaksi';
-$labels = [];
-$data = [];
+// Query data untuk dashboard
+$query_stok_total = "SELECT SUM(stok) as total FROM tbl_produk";
+$result_stok_total = $conn->query($query_stok_total);
+$stok_total = $result_stok_total->fetch_assoc()['total'];
 
-// Query untuk Ringkasan Transaksi Hari Ini
-$query_jumlah_transaksi = "SELECT COUNT(*) AS jumlah FROM tbl_transaksi WHERE DATE(tanggal) = CURDATE()";
-$result_jumlah_transaksi = $conn->query($query_jumlah_transaksi);
-if ($result_jumlah_transaksi) {
-    $jumlah_transaksi = $result_jumlah_transaksi->fetch_assoc()['jumlah'] ?? 0;
-}
+$query_barang_masuk = "SELECT COUNT(*) as total FROM tbl_riwayat_masuk WHERE DATE(tanggal) = CURDATE()";
+$result_barang_masuk = $conn->query($query_barang_masuk);
+$barang_masuk = $result_barang_masuk->fetch_assoc()['total'];
 
-$query_total_pendapatan = "SELECT SUM(harga_total) AS total FROM tbl_transaksi WHERE DATE(tanggal) = CURDATE()";
-$result_total_pendapatan = $conn->query($query_total_pendapatan);
-if ($result_total_pendapatan) {
-    $total_pendapatan = $result_total_pendapatan->fetch_assoc()['total'] ?? 0;
-}
+$query_barang_keluar = "SELECT COUNT(*) as total FROM tbl_riwayat_keluar WHERE DATE(tanggal) = CURDATE()";
+$result_barang_keluar = $conn->query($query_barang_keluar);
+$barang_keluar = $result_barang_keluar->fetch_assoc()['total'];
 
-$query_produk_terlaris = "SELECT p.nama, SUM(t.jumlah) AS total_terjual 
-                          FROM tbl_transaksi t 
-                          JOIN tbl_produk p ON t.produk_id = p.id 
-                          WHERE DATE(t.tanggal) = CURDATE() 
-                          GROUP BY t.produk_id 
-                          ORDER BY total_terjual DESC 
-                          LIMIT 1";
-$result_produk_terlaris = $conn->query($query_produk_terlaris);
-if ($result_produk_terlaris && $result_produk_terlaris->num_rows > 0) {
-    $produk_terlaris = $result_produk_terlaris->fetch_assoc()['nama'];
-}
+$query_stok_minimal = "SELECT COUNT(*) as total FROM tbl_produk WHERE stok <= min_stok";
+$result_stok_minimal = $conn->query($query_stok_minimal);
+$stok_minimal = $result_stok_minimal->fetch_assoc()['total'];
 
-// Query untuk Grafik Statistik Penjualan (7 Hari Terakhir)
-$query_grafik = "SELECT DATE(tanggal) AS tanggal, SUM(harga_total) AS total 
-                 FROM tbl_transaksi 
-                 WHERE tanggal >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
-                 GROUP BY DATE(tanggal) 
-                 ORDER BY tanggal ASC";
-$result_grafik = $conn->query($query_grafik);
-
-if ($result_grafik) {
-    while ($row = $result_grafik->fetch_assoc()) {
-        $labels[] = date('d M', strtotime($row['tanggal']));
-        $data[] = $row['total'] ?? 0;
-    }
-}
-
-// Query untuk Transaksi Terakhir
-$query_transaksi_terakhir = "SELECT t.id, p.nama as produk, t.jumlah, t.harga_total, t.tanggal 
-                            FROM tbl_transaksi t
-                            JOIN tbl_produk p ON t.produk_id = p.id
-                            ORDER BY t.tanggal DESC LIMIT 5";
-$transaksi_terakhir = $conn->query($query_transaksi_terakhir);
+$query_riwayat_terakhir = "SELECT 
+    p.nama as produk, 
+    rm.jumlah, 
+    rm.tanggal,
+    'Masuk' as tipe
+    FROM tbl_riwayat_masuk rm
+    JOIN tbl_produk p ON rm.produk_id = p.id
+    ORDER BY rm.tanggal DESC LIMIT 5";
+$riwayat_terakhir = $conn->query($query_riwayat_terakhir);
 ?>
 
 <!DOCTYPE html>
@@ -79,111 +49,58 @@ $transaksi_terakhir = $conn->query($query_transaksi_terakhir);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Kasir</title>
+    <title>Dashboard Gudang</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #34495e;
-            --accent-color: #3498db;
-            --success-color: #27ae60;
-            --warning-color: #f39c12;
-            --danger-color: #e74c3c;
+        .card-counter {
+            box-shadow: 2px 2px 10px #DADADA;
+            margin: 5px;
+            padding: 20px 10px;
+            border-radius: 5px;
+            transition: .3s linear all;
         }
-        
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        .card-counter:hover {
+            box-shadow: 4px 4px 20px #DADADA;
+            transition: .3s linear all;
         }
-        
-        .kasir-nav {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        .card-counter.primary {
+            background-color: #007bff;
+            color: #FFF;
         }
-        
-        .dashboard-card {
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-            border: none;
-            overflow: hidden;
-            margin-bottom: 20px;
+        .card-counter.success {
+            background-color: #28a745;
+            color: #FFF;
         }
-        
-        .dashboard-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        .card-counter.warning {
+            background-color: #ffc107;
+            color: #FFF;
         }
-        
-        .stat-card {
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
+        .card-counter.danger {
+            background-color: #dc3545;
+            color: #FFF;
         }
-        
-        .stat-card i {
-            font-size: 2.5rem;
-            opacity: 0.2;
-            position: absolute;
-            right: 20px;
-            top: 20px;
+        .card-counter i {
+            font-size: 2.5em;
+            opacity: 0.3;
         }
-        
-        .stat-card .stat-value {
-            font-size: 1.8rem;
-            font-weight: bold;
-            margin-bottom: 5px;
+        .card-counter .count-numbers {
+            font-size: 1.8em;
+            display: block;
         }
-        
-        .stat-card .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        
-        .card-header {
-            font-weight: 600;
-            background-color: var(--primary-color);
-            color: white;
-        }
-        
-        .transaction-item {
-            border-left: 3px solid var(--accent-color);
-            transition: all 0.2s ease;
-            margin-bottom: 8px;
-        }
-        
-        .transaction-item:hover {
-            background-color: #f8f9fa;
-            transform: translateX(5px);
-        }
-        
-        .quick-action-btn {
-            transition: all 0.2s ease;
-        }
-        
-        .quick-action-btn:hover {
-            transform: translateY(-3px);
-        }
-        
-        .date-display {
-            background-color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            font-weight: 500;
+        .card-counter .count-name {
+            font-style: italic;
+            opacity: 0.8;
+            display: block;
+            font-size: 1em;
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark kasir-nav">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <i class="bi bi-cash-stack me-2"></i> Sistem Manajemen Inventaris
+                <i class="bi bi-box-seam"></i> Sistem Manajemen Inventaris 
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -191,23 +108,23 @@ $transaksi_terakhir = $conn->query($query_transaksi_terakhir);
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="dashboard.php">
-                            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                        <a class="nav-link" href="kelola_stok.php">
+                            <i class="bi bi-boxes"></i> Kelola Stok Gudang
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="transaksi.php">
-                            <i class="bi bi-cart-plus me-1"></i> Transaksi
+                        <a class="nav-link" href="riwayat_masuk.php">
+                            <i class="bi bi-box-arrow-in-down"></i> Riwayat Produk Masuk
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="riwayat_transaksi.php">
-                            <i class="bi bi-receipt me-1"></i> Riwayat
+                        <a class="nav-link" href="riwayat_keluar.php">
+                            <i class="bi bi-box-arrow-up"></i> Riwayat Produk Keluar
                         </a>
                     </li>
                     <li class="nav-item">
-                        <button class="btn btn-outline-light ms-2" onclick="logout()">
-                            <i class="bi bi-box-arrow-right me-1"></i> Logout
+                        <button class="btn btn-danger" onclick="logout()">
+                            <i class="bi bi-box-arrow-right"></i> Logout
                         </button>
                     </li>
                 </ul>
@@ -217,107 +134,151 @@ $transaksi_terakhir = $conn->query($query_transaksi_terakhir);
 
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="mb-0"><i class="bi bi-speedometer2 me-2"></i> Dashboard Kasir</h2>
-                <p class="mb-0 text-muted">Selamat datang, <strong><?php echo htmlspecialchars($username); ?></strong></p>
-            </div>
-            <div class="date-display">
-                <i class="bi bi-calendar3 me-2"></i><?php echo date('l, d F Y'); ?>
+            <h2><i class="bi bi-speedometer2"></i> Dashboard Gudang</h2>
+            <div class="text-muted">
+                <?php echo date('l, d F Y'); ?>
             </div>
         </div>
+        
+        <p class="mb-4">Selamat datang, <strong><?php echo $_SESSION['username'] ?? 'Pengguna'; ?></strong>! di sistem manajemen stok gudang.</p>
 
-        <!-- Statistik Ringkasan -->
+        <!-- Ringkasan Statistik -->
         <div class="row mb-4">
-            <div class="col-md-4 mb-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, var(--accent-color), #2980b9);">
-                    <i class="bi bi-cart-check"></i>
-                    <div class="stat-value"><?php echo $jumlah_transaksi; ?></div>
-                    <div class="stat-label">Transaksi Hari Ini</div>
+            <div class="col-md-3">
+                <div class="card-counter primary">
+                    <i class="bi bi-box-seam"></i>
+                    <span class="count-numbers"><?php echo $stok_total; ?></span>
+                    <span class="count-name">Total Stok</span>
                 </div>
             </div>
             
-            <div class="col-md-4 mb-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, var(--success-color), #2ecc71);">
-                    <i class="bi bi-currency-dollar"></i>
-                    <div class="stat-value">Rp<?php echo number_format($total_pendapatan, 0, ',', '.'); ?></div>
-                    <div class="stat-label">Pendapatan Hari Ini</div>
+            <div class="col-md-3">
+                <div class="card-counter success">
+                    <i class="bi bi-box-arrow-in-down"></i>
+                    <span class="count-numbers"><?php echo $barang_masuk; ?></span>
+                    <span class="count-name">Produk Masuk Hari Ini</span>
                 </div>
             </div>
             
-            <div class="col-md-4 mb-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, var(--warning-color), #f1c40f);">
-                    <i class="bi bi-trophy"></i>
-                    <div class="stat-value"><?php echo htmlspecialchars(mb_strimwidth($produk_terlaris, 0, 24,)); ?></div>
-                    <div class="stat-label">Produk Terlaris</div>
+            <div class="col-md-3">
+                <div class="card-counter warning">
+                    <i class="bi bi-box-arrow-up"></i>
+                    <span class="count-numbers"><?php echo $barang_keluar; ?></span>
+                    <span class="count-name">Produk Keluar Hari Ini</span>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card-counter danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span class="count-numbers"><?php echo $stok_minimal; ?></span>
+                    <span class="count-name">Stok Perlu Restock</span>
                 </div>
             </div>
         </div>
 
         <!-- Dua Kolom Konten -->
         <div class="row">
-            <!-- Kolom Pertama - Grafik -->
-            <div class="col-lg-8 mb-4">
-                <div class="dashboard-card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-graph-up me-2"></i> Statistik Penjualan 7 Hari Terakhir</span>
-                        <span class="badge bg-light text-dark"><?php echo date('d M Y'); ?></span>
+            <!-- Kolom Pertama -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-clock-history"></i> Riwayat Terakhir
                     </div>
                     <div class="card-body">
-                        <canvas id="penjualanChart" height="250"></canvas>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Produk</th>
+                                        <th>Jumlah</th>
+                                        <th>Tanggal</th>
+                                        <th>Tipe</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php while($row = $riwayat_terakhir->fetch_assoc()): ?>
+                                    <tr>
+                                        <td><?php echo $row['produk']; ?></td>
+                                        <td><?php echo $row['jumlah']; ?></td>
+                                        <td><?php echo $row['tanggal']; ?></td>
+                                        <td>
+                                            <?php if($row['tipe'] == 'Masuk'): ?>
+                                                <span class="badge bg-success"><?php echo $row['tipe']; ?></span>
+                                            <?php else: ?>
+                                                <span class="badge bg-warning"><?php echo $row['tipe']; ?></span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                    <?php endwhile; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Kolom Kedua - Transaksi Terakhir -->
-            <div class="col-lg-4 mb-4">
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <i class="bi bi-clock-history me-2"></i> Transaksi Terakhir
+            <!-- Kolom Kedua -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-exclamation-triangle"></i> Stok Perlu Perhatian
                     </div>
                     <div class="card-body">
-                        <?php if ($transaksi_terakhir && $transaksi_terakhir->num_rows > 0): ?>
+                        <?php 
+                        $query_stok_perhatian = "SELECT p.nama, p.stok, p.min_stok 
+                                               FROM tbl_produk p 
+                                               WHERE p.stok <= p.min_stok 
+                                               ORDER BY p.stok ASC 
+                                               LIMIT 5";
+                        $stok_perhatian = $conn->query($query_stok_perhatian);
+                        
+                        if($stok_perhatian->num_rows > 0): ?>
                             <div class="list-group">
-                                <?php while($row = $transaksi_terakhir->fetch_assoc()): 
-                                    $harga_satuan = ($row['jumlah'] > 0) ? $row['harga_total']/$row['jumlah'] : 0;
-                                ?>
-                                <div class="transaction-item p-3">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <h6 class="mb-1 fw-bold"><?php echo htmlspecialchars($row['produk']); ?></h6>
-                                            <small class="text-muted"><?php echo $row['jumlah']; ?> x Rp<?php echo number_format($harga_satuan, 0, ',', '.'); ?></small>
-                                        </div>
-                                        <div class="text-end">
-                                            <small class="text-muted"><?php echo date('H:i', strtotime($row['tanggal'])); ?></small>
-                                            <div class="fw-bold text-success">Rp<?php echo number_format($row['harga_total'], 0, ',', '.'); ?></div>
-                                        </div>
+                                <?php while($item = $stok_perhatian->fetch_assoc()): ?>
+                                <a href="kelola_stok.php" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1"><?php echo $item['nama']; ?></h6>
+                                        <small class="text-danger"><?php echo $item['stok']; ?> / <?php echo $item['min_stok']; ?></small>
                                     </div>
-                                </div>
+                                    <div class="progress mt-2">
+                                        <?php 
+                                        $percentage = ($item['stok'] / $item['min_stok']) * 100;
+                                        if($percentage > 100) $percentage = 100;
+                                        ?>
+                                        <div class="progress-bar bg-danger" 
+                                             role="progressbar" 
+                                             style="width: <?php echo $percentage; ?>%" 
+                                             aria-valuenow="<?php echo $percentage; ?>" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100"></div>
+                                    </div>
+                                </a>
                                 <?php endwhile; ?>
                             </div>
                         <?php else: ?>
-                            <div class="text-center py-4">
-                                <i class="bi bi-cart-x text-muted" style="font-size: 3rem;"></i>
-                                <p class="mt-2 text-muted">Belum ada transaksi</p>
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i> Semua stok dalam kondisi aman
                             </div>
                         <?php endif; ?>
                     </div>
                 </div>
                 
                 <!-- Quick Actions -->
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <i class="bi bi-lightning me-2"></i> Akses Cepat
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-lightning"></i> Akses Cepat
                     </div>
                     <div class="card-body">
                         <div class="row g-2">
                             <div class="col-md-6">
-                                <a href="transaksi.php" class="btn btn-primary w-100 quick-action-btn">
-                                    <i class="bi bi-cart-plus me-1"></i> Transaksi Penjualan
+                                <a href="kelola_stok.php?action=add" class="btn btn-primary w-100">
+                                    <i class="bi bi-plus-circle"></i> Tambah Stok
                                 </a>
                             </div>
                             <div class="col-md-6">
-                                <a href="riwayat_transaksi.php" class="btn btn-success w-100 quick-action-btn">
-                                    <i class="bi bi-receipt me-1"></i> Riwayat
+                                <a href="riwayat_masuk.php" class="btn btn-success w-100">
+                                    <i class="bi bi-list-check"></i> Lihat Riwayat
                                 </a>
                             </div>
                         </div>
@@ -328,70 +289,11 @@ $transaksi_terakhir = $conn->query($query_transaksi_terakhir);
     </div>
 
     <script>
-           function logout() {
-            if (confirm('Apakah Anda yakin ingin logout?')) {
-                sessionStorage.clear();
-                localStorage.clear();
-                window.location.href = "../index.html";
-            }
+        function logout() {
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = "../index.html";
         }
-
-        // Grafik Statistik Penjualan
-        document.addEventListener('DOMContentLoaded', function() {
-            const ctx = document.getElementById('penjualanChart').getContext('2d');
-            const penjualanChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: <?php echo json_encode($labels); ?>,
-                    datasets: [{
-                        label: 'Pendapatan Harian',
-                        data: <?php echo json_encode($data); ?>,
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        borderColor: 'rgba(52, 152, 219, 1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true,
-                        pointBackgroundColor: 'rgba(52, 152, 219, 1)',
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return 'Rp' + context.raw.toLocaleString('id-ID');
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'Rp' + value.toLocaleString('id-ID');
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        }
-                    }
-                }
-            });
-        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
