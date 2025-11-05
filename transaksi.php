@@ -224,7 +224,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['checkout'])) {
     <nav class="navbar navbar-expand-lg navbar-dark kasir-nav">
         <div class="container-fluid">
             <a class="navbar-brand" href="dashboard.php">
-                <i class="bi bi-cash-stack"></i> Kasir Tiga Jaya Motor
+                <i class="bi bi-cash-stack"></i> Sistem Manajemen Inventaris
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
