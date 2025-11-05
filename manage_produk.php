@@ -125,7 +125,7 @@ $result = $conn->query($query);
     <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #2c3e50, #34495e);">
         <div class="container-fluid">
             <a class="navbar-brand" href="dashboard.php">
-                <i class="bi bi-box-seam"></i> Inventory System
+                <i class="bi bi-box-seam"></i> Sistem Manajemen Inventaris
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>

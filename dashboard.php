@@ -1,11 +1,18 @@
 <?php
 session_start();
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Gudang') {
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+if (!isset($_SESSION['isAuthenticated']) || $_SESSION['isAuthenticated'] !== true) {
     header("Location: ../index.html");
     exit();
 }
 
-// Koneksi database
+if ($_SESSION['role'] !== 'Admin') {
+    header("Location: ../index.html");
+    exit();
+}
+
 $host = "localhost";
 $user = "root";
 $password = "";
@@ -16,32 +23,39 @@ if ($conn->connect_error) {
     die("Koneksi database gagal: " . $conn->connect_error);
 }
 
-// Query data untuk dashboard
-$query_stok_total = "SELECT SUM(stok) as total FROM tbl_produk";
-$result_stok_total = $conn->query($query_stok_total);
-$stok_total = $result_stok_total->fetch_assoc()['total'];
+// Query untuk Admin Dashboard
+$query_total_produk = "SELECT COUNT(*) as total FROM tbl_produk";
+$result_total_produk = $conn->query($query_total_produk);
+$total_produk = $result_total_produk->fetch_assoc()['total'];
 
-$query_barang_masuk = "SELECT COUNT(*) as total FROM tbl_riwayat_masuk WHERE DATE(tanggal) = CURDATE()";
-$result_barang_masuk = $conn->query($query_barang_masuk);
-$barang_masuk = $result_barang_masuk->fetch_assoc()['total'];
+$query_total_kategori = "SELECT COUNT(*) as total FROM tbl_kategori";
+$result_total_kategori = $conn->query($query_total_kategori);
+$total_kategori = $result_total_kategori->fetch_assoc()['total'];
 
-$query_barang_keluar = "SELECT COUNT(*) as total FROM tbl_riwayat_keluar WHERE DATE(tanggal) = CURDATE()";
-$result_barang_keluar = $conn->query($query_barang_keluar);
-$barang_keluar = $result_barang_keluar->fetch_assoc()['total'];
+$query_total_transaksi = "SELECT COUNT(*) as total FROM (
+                          SELECT id FROM tbl_riwayat_masuk WHERE DATE(tanggal) = CURDATE()
+                          UNION ALL
+                          SELECT id FROM tbl_riwayat_keluar WHERE DATE(tanggal) = CURDATE()
+                        ) as combined";
+$result_total_transaksi = $conn->query($query_total_transaksi);
+$total_transaksi = $result_total_transaksi->fetch_assoc()['total'];
 
-$query_stok_minimal = "SELECT COUNT(*) as total FROM tbl_produk WHERE stok <= min_stok";
-$result_stok_minimal = $conn->query($query_stok_minimal);
-$stok_minimal = $result_stok_minimal->fetch_assoc()['total'];
+// Riwayat aktivitas terakhir
+$query_riwayat = "SELECT 
+                 'Masuk' as tipe, p.nama as produk, rm.jumlah, rm.tanggal
+                 FROM tbl_riwayat_masuk rm
+                 JOIN tbl_produk p ON rm.produk_id = p.id
+                 UNION ALL
+                 SELECT 
+                 'Keluar' as tipe, p.nama as produk, rk.jumlah, rk.tanggal
+                 FROM tbl_riwayat_keluar rk
+                 JOIN tbl_produk p ON rk.produk_id = p.id
+                 ORDER BY tanggal DESC LIMIT 5";
+$riwayat_terakhir = $conn->query($query_riwayat);
 
-$query_riwayat_terakhir = "SELECT 
-    p.nama as produk, 
-    rm.jumlah, 
-    rm.tanggal,
-    'Masuk' as tipe
-    FROM tbl_riwayat_masuk rm
-    JOIN tbl_produk p ON rm.produk_id = p.id
-    ORDER BY rm.tanggal DESC LIMIT 5";
-$riwayat_terakhir = $conn->query($query_riwayat_terakhir);
+// Produk dengan stok rendah
+$query_stok_rendah = "SELECT nama, stok, min_stok FROM tbl_produk WHERE stok <= min_stok ORDER BY stok ASC LIMIT 5";
+$stok_rendah = $conn->query($query_stok_rendah);
 ?>
 
 <!DOCTYPE html>
@@ -49,7 +63,7 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Gudang</title>
+    <title>Dashboard Admin - Inventory System</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
@@ -94,13 +108,16 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
             display: block;
             font-size: 1em;
         }
+        .admin-nav {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark admin-nav">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <i class="bi bi-box-seam"></i> Sistem Manajemen Inventaris 
+                <i class="bi bi-shield-lock"></i> Sistem Manajemen Inventaris 
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -108,18 +125,13 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="kelola_stok.php">
-                            <i class="bi bi-boxes"></i> Kelola Stok Gudang
+                        <a class="nav-link" href="manage_produk.php">
+                            <i class="bi bi-box-seam"></i> Produk
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="riwayat_masuk.php">
-                            <i class="bi bi-box-arrow-in-down"></i> Riwayat Produk Masuk
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="riwayat_keluar.php">
-                            <i class="bi bi-box-arrow-up"></i> Riwayat Produk Keluar
+                        <a class="nav-link" href="reports.php">
+                            <i class="bi bi-graph-up"></i> Laporan
                         </a>
                     </li>
                     <li class="nav-item">
@@ -134,45 +146,37 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
 
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2><i class="bi bi-speedometer2"></i> Dashboard Gudang</h2>
+            <h2><i class="bi bi-speedometer2"></i> Dashboard Admin</h2>
             <div class="text-muted">
                 <?php echo date('l, d F Y'); ?>
             </div>
         </div>
         
-        <p class="mb-4">Selamat datang, <strong><?php echo $_SESSION['username'] ?? 'Pengguna'; ?></strong>! di sistem manajemen stok gudang.</p>
+        <p class="mb-4">Selamat datang, <strong><?php echo $_SESSION['username'] ?? 'Admin'; ?></strong>! Anda login sebagai Administrator Sistem.</p>
 
         <!-- Ringkasan Statistik -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card-counter primary">
                     <i class="bi bi-box-seam"></i>
-                    <span class="count-numbers"><?php echo $stok_total; ?></span>
-                    <span class="count-name">Total Stok</span>
+                    <span class="count-numbers"><?php echo $total_produk; ?></span>
+                    <span class="count-name">Total Produk</span>
                 </div>
             </div>
             
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card-counter success">
-                    <i class="bi bi-box-arrow-in-down"></i>
-                    <span class="count-numbers"><?php echo $barang_masuk; ?></span>
-                    <span class="count-name">Produk Masuk Hari Ini</span>
+                    <i class="bi bi-tags"></i>
+                    <span class="count-numbers"><?php echo $total_kategori; ?></span>
+                    <span class="count-name">Kategori Produk</span>
                 </div>
             </div>
             
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card-counter warning">
-                    <i class="bi bi-box-arrow-up"></i>
-                    <span class="count-numbers"><?php echo $barang_keluar; ?></span>
-                    <span class="count-name">Produk Keluar Hari Ini</span>
-                </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="card-counter danger">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <span class="count-numbers"><?php echo $stok_minimal; ?></span>
-                    <span class="count-name">Stok Perlu Restock</span>
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span class="count-numbers"><?php echo $total_transaksi; ?></span>
+                    <span class="count-name">Transaksi Hari Ini</span>
                 </div>
             </div>
         </div>
@@ -183,7 +187,7 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
             <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">
-                        <i class="bi bi-clock-history"></i> Riwayat Terakhir
+                        <i class="bi bi-clock-history"></i> Aktivitas Terakhir
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -191,17 +195,15 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
                                 <thead>
                                     <tr>
                                         <th>Produk</th>
-                                        <th>Jumlah</th>
-                                        <th>Tanggal</th>
                                         <th>Tipe</th>
+                                        <th>Jumlah</th>
+                                        <th>Waktu</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php while($row = $riwayat_terakhir->fetch_assoc()): ?>
                                     <tr>
-                                        <td><?php echo $row['produk']; ?></td>
-                                        <td><?php echo $row['jumlah']; ?></td>
-                                        <td><?php echo $row['tanggal']; ?></td>
+                                        <td><?php echo htmlspecialchars($row['produk']); ?></td>
                                         <td>
                                             <?php if($row['tipe'] == 'Masuk'): ?>
                                                 <span class="badge bg-success"><?php echo $row['tipe']; ?></span>
@@ -209,6 +211,8 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
                                                 <span class="badge bg-warning"><?php echo $row['tipe']; ?></span>
                                             <?php endif; ?>
                                         </td>
+                                        <td><?php echo $row['jumlah']; ?></td>
+                                        <td><?php echo date('H:i', strtotime($row['tanggal'])); ?></td>
                                     </tr>
                                     <?php endwhile; ?>
                                 </tbody>
@@ -221,24 +225,16 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
             <!-- Kolom Kedua -->
             <div class="col-md-6">
                 <div class="card mb-4">
-                    <div class="card-header bg-success text-white">
+                    <div class="card-header bg-danger text-white">
                         <i class="bi bi-exclamation-triangle"></i> Stok Perlu Perhatian
                     </div>
                     <div class="card-body">
-                        <?php 
-                        $query_stok_perhatian = "SELECT p.nama, p.stok, p.min_stok 
-                                               FROM tbl_produk p 
-                                               WHERE p.stok <= p.min_stok 
-                                               ORDER BY p.stok ASC 
-                                               LIMIT 5";
-                        $stok_perhatian = $conn->query($query_stok_perhatian);
-                        
-                        if($stok_perhatian->num_rows > 0): ?>
+                        <?php if($stok_rendah->num_rows > 0): ?>
                             <div class="list-group">
-                                <?php while($item = $stok_perhatian->fetch_assoc()): ?>
-                                <a href="kelola_stok.php" class="list-group-item list-group-item-action">
+                                <?php while($item = $stok_rendah->fetch_assoc()): ?>
+                                <a href="manage_produk.php" class="list-group-item list-group-item-action">
                                     <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1"><?php echo $item['nama']; ?></h6>
+                                        <h6 class="mb-1"><?php echo htmlspecialchars($item['nama']); ?></h6>
                                         <small class="text-danger"><?php echo $item['stok']; ?> / <?php echo $item['min_stok']; ?></small>
                                     </div>
                                     <div class="progress mt-2">
@@ -272,13 +268,13 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
                     <div class="card-body">
                         <div class="row g-2">
                             <div class="col-md-6">
-                                <a href="kelola_stok.php?action=add" class="btn btn-primary w-100">
-                                    <i class="bi bi-plus-circle"></i> Tambah Stok
+                                <a href="manage_produk.php" class="btn btn-primary w-100">
+                                    <i class="bi bi-box-seam"></i> Manajemen Produk
                                 </a>
                             </div>
                             <div class="col-md-6">
-                                <a href="riwayat_masuk.php" class="btn btn-success w-100">
-                                    <i class="bi bi-list-check"></i> Lihat Riwayat
+                                <a href="reports.php" class="btn btn-success w-100">
+                                    <i class="bi bi-graph-up"></i> Lihat Laporan
                                 </a>
                             </div>
                         </div>
@@ -290,9 +286,11 @@ $riwayat_terakhir = $conn->query($query_riwayat_terakhir);
 
     <script>
         function logout() {
-            sessionStorage.clear();
-            localStorage.clear();
-            window.location.href = "../index.html";
+            if (confirm('Apakah Anda yakin ingin logout?')) {
+                sessionStorage.clear();
+                localStorage.clear();
+                window.location.href = "../index.html";
+            }
         }
     </script>
 

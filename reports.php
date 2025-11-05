@@ -81,7 +81,7 @@ while ($row = $result_chart->fetch_assoc()) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan Stok - Inventory System</title>
+    <title>Laporan Stok - Sistem Manajemen Inventaris</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -137,7 +137,7 @@ while ($row = $result_chart->fetch_assoc()) {
     <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #2c3e50, #34495e);">
         <div class="container-fluid">
             <a class="navbar-brand" href="dashboard.php">
-                <i class="bi bi-clipboard-data"></i> Inventory System
+                <i class="bi bi-clipboard-data"></i> Sistem Manajemen Inventaris
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -233,12 +233,6 @@ while ($row = $result_chart->fetch_assoc()) {
                     <div class="col-md-6 text-end export-buttons">
                         <button class="btn btn-outline-primary" onclick="printReport()">
                             <i class="bi bi-printer"></i> Cetak
-                        </button>
-                        <button class="btn btn-outline-success" onclick="exportToExcel()">
-                            <i class="bi bi-file-excel"></i> Excel
-                        </button>
-                        <button class="btn btn-outline-danger" onclick="exportToPDF()">
-                            <i class="bi bi-file-earmark-pdf"></i> PDF
                         </button>
                     </div>
                 </div>
@@ -354,16 +348,6 @@ while ($row = $result_chart->fetch_assoc()) {
         // Fungsi ekspor
         function printReport() {
             window.print();
-        }
-
-        function exportToExcel() {
-            // Implementasi ekspor ke Excel bisa menggunakan library seperti SheetJS
-            alert('Fitur ekspor ke Excel akan diimplementasikan');
-        }
-
-        function exportToPDF() {
-            // Implementasi ekspor ke PDF bisa menggunakan library seperti jsPDF
-            alert('Fitur ekspor ke PDF akan diimplementasikan');
         }
 
         // Grafik Stok
